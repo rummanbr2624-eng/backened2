@@ -1,0 +1,144 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backend2 | User Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h2>Backend2</h2>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="#" id="logout">Logout</a>
+        </nav>
+    </header>
+
+    <main class="dashboard-container">
+        <h1>Welcome to Your Dashboard</h1>
+        <p>Manage your account and explore the user directory.</p>
+
+        <section class="dashboard-card">
+            <h2>My Profile</h2>
+            <div id="profile">Loading profile...</div>
+
+            <h3>Update Profile</h3>
+            <form id="updateForm">
+                <label>Name</label>
+                <input type="text" id="name" required>
+
+                <label>Email</label>
+                <input type="email" id="email" required>
+
+                <button class="auth-button" type="submit">Update Profile</button>
+            </form>
+
+            <p id="message"></p>
+        </section>
+
+        <section class="dashboard-card">
+            <h2>User Directory</h2>
+            <div id="userList">Loading users...</div>
+        </section>
+
+        <button id="deleteAccount" class="danger-button">Delete My Account</button>
+    </main>
+
+    <script>
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            window.location.href = "login.html";
+        }
+
+        const headers = {
+            "Authorization": "Bearer " + token,
+            "Content-Type": "application/json"
+        };
+
+        async function loadProfile() {
+            const response = await fetch("/api/users/profile", { headers });
+            const data = await response.json();
+
+            if (!response.ok) {
+                alert(data.message || "Please login again");
+                logout();
+                return;
+            }
+
+            document.getElementById("profile").innerHTML =
+                `<p><strong>Name:</strong> ${data.name}</p>
+                 <p><strong>Email:</strong> ${data.email}</p>
+                 <p><strong>Role:</strong> ${data.role}</p>`;
+
+            document.getElementById("name").value = data.name;
+            document.getElementById("email").value = data.email;
+        }
+
+        async function loadUsers() {
+            const response = await fetch("/api/users/all", { headers });
+            const users = await response.json();
+
+            if (!response.ok) {
+                document.getElementById("userList").textContent =
+                    users.message || "Unable to load users";
+                return;
+            }
+
+            document.getElementById("userList").innerHTML =
+                users.map(user =>
+                    `<div class="user-item">
+                        <strong>${user.name}</strong>
+                        <p>${user.email}</p>
+                    </div>`
+                ).join("");
+        }
+
+        document.getElementById("updateForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById("name").value;
+            const email = document.getElementById("email").value;
+
+            const response = await fetch("/api/users/profile", {
+                method: "PUT",
+                headers,
+                body: JSON.stringify({ name, email })
+            });
+
+            const data = await response.json();
+            document.getElementById("message").textContent = data.message;
+
+            if (response.ok) loadProfile();
+        });
+
+        document.getElementById("deleteAccount").addEventListener("click", async () => {
+            if (!confirm("Are you sure you want to delete your account?")) return;
+
+            const response = await fetch("/api/users/profile", {
+                method: "DELETE",
+                headers
+            });
+
+            if (response.ok) {
+                localStorage.clear();
+                window.location.href = "signup.html";
+            }
+        });
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = "login.html";
+        }
+
+        document.getElementById("logout").addEventListener("click", logout);
+
+        loadProfile();
+        loadUsers();
+    </script>
+
+</body>
+</html>

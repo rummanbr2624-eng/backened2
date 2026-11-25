@@ -1,0 +1,215 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backend2 | Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h2>Backend2 Admin</h2>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="#" id="logout">Logout</a>
+        </nav>
+    </header>
+
+    <main class="dashboard-container">
+        <h1>Admin Dashboard</h1>
+        <p>Manage registered accounts and monitor activity.</p>
+
+        <section class="stats-container">
+            <div class="stat-card">
+                <h3>Total Accounts</h3>
+                <h2 id="total">0</h2>
+            </div>
+
+            <div class="stat-card">
+                <h3>Active Accounts</h3>
+                <h2 id="active">0</h2>
+            </div>
+
+            <div class="stat-card">
+                <h3>Inactive Accounts</h3>
+                <h2 id="inactive">0</h2>
+            </div>
+        </section>
+
+        <section class="dashboard-card">
+            <h2>All Registered Accounts</h2>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="accountList"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const token = localStorage.getItem("token");
+        const role = localStorage.getItem("role");
+
+        if (!token || role !== "admin") {
+            window.location.href = "login.html";
+        }
+
+        const headers = {
+            "Authorization": "Bearer " + token,
+            "Content-Type": "application/json"
+        };
+
+        async function loadStats() {
+            const response = await fetch("/api/admin/stats", { headers });
+            const data = await response.json();
+
+            if (!response.ok) {
+                alert(data.message || "Unable to load statistics");
+                return;
+            }
+
+            document.getElementById("total").textContent = data.total;
+            document.getElementById("active").textContent = data.active;
+            document.getElementById("inactive").textContent = data.inactive;
+        }
+
+        async function loadAccounts() {
+            const response = await fetch("/api/admin/all", { headers });
+            const accounts = await response.json();
+
+            if (!response.ok) {
+                alert(accounts.message || "Unable to load accounts");
+                return;
+            }
+
+            const list = document.getElementById("accountList");
+            list.innerHTML = "";
+
+            accounts.forEach(account => {
+                const row = document.createElement("tr");
+
+                const nameCell = document.createElement("td");
+                nameCell.textContent = account.name;
+
+                const emailCell = document.createElement("td");
+                emailCell.textContent = account.email;
+
+                const roleCell = document.createElement("td");
+                roleCell.textContent = account.role;
+
+                const statusCell = document.createElement("td");
+                statusCell.textContent = account.status;
+
+                const actionCell = document.createElement("td");
+
+                const editButton = document.createElement("button");
+                editButton.textContent = "Edit";
+                editButton.className = "small-button";
+                editButton.onclick = () => editAccount(account);
+
+                const statusButton = document.createElement("button");
+                statusButton.textContent =
+                    account.status === "active" ? "Deactivate" : "Activate";
+                statusButton.className = "small-button";
+                statusButton.onclick = () => toggleStatus(account);
+
+                const deleteButton = document.createElement("button");
+                deleteButton.textContent = "Delete";
+                deleteButton.className = "danger-small";
+                deleteButton.onclick = () => deleteAccount(account._id);
+
+                actionCell.append(editButton, statusButton, deleteButton);
+                row.append(nameCell, emailCell, roleCell, statusCell, actionCell);
+                list.appendChild(row);
+            });
+        }
+
+        async function editAccount(account) {
+            const name = prompt("Enter new name:", account.name);
+            if (name === null) return;
+
+            const email = prompt("Enter new email:", account.email);
+            if (email === null) return;
+
+            const role = prompt("Enter role (user/admin):", account.role);
+            if (!["user", "admin"].includes(role)) {
+                alert("Invalid role");
+                return;
+            }
+
+            const response = await fetch("/api/admin/" + account._id, {
+                method: "PUT",
+                headers,
+                body: JSON.stringify({
+                    name,
+                    email,
+                    role,
+                    status: account.status
+                })
+            });
+
+            const data = await response.json();
+            alert(data.message);
+            if (response.ok) refreshDashboard();
+        }
+
+        async function toggleStatus(account) {
+            const newStatus =
+                account.status === "active" ? "inactive" : "active";
+
+            const response = await fetch("/api/admin/" + account._id, {
+                method: "PUT",
+                headers,
+                body: JSON.stringify({
+                    name: account.name,
+                    email: account.email,
+                    role: account.role,
+                    status: newStatus
+                })
+            });
+
+            const data = await response.json();
+            alert(data.message);
+            if (response.ok) refreshDashboard();
+        }
+
+        async function deleteAccount(id) {
+            if (!confirm("Are you sure you want to delete this account?")) return;
+
+            const response = await fetch("/api/admin/" + id, {
+                method: "DELETE",
+                headers
+            });
+
+            const data = await response.json();
+            alert(data.message);
+            if (response.ok) refreshDashboard();
+        }
+
+        function refreshDashboard() {
+            loadStats();
+            loadAccounts();
+        }
+
+        document.getElementById("logout").addEventListener("click", () => {
+            localStorage.clear();
+            window.location.href = "login.html";
+        });
+
+        refreshDashboard();
+    </script>
+
+</body>
+</html>
